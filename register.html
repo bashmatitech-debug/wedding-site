@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Register</title>
+<style>
+body{font-family:sans-serif;max-width:400px;margin:30px auto;padding:0 16px}
+input,button{width:100%;padding:12px;margin:8px 0;font-size:16px;box-sizing:border-box}
+#msg{color:#b00}
+</style>
+</head>
+<body>
+<h2>Join the celebration</h2>
+<input id="name" placeholder="Full name">
+<input id="origin" placeholder="Where are you from?">
+<input id="email" type="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password (min 6 characters)">
+<button onclick="register()">Register</button>
+<p id="msg"></p>
+<p>Already registered? <a href="login.html">Log in</a></p>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+async function register(){
+  const name=document.getElementById("name").value.trim();
+  const origin=document.getElementById("origin").value.trim();
+  const email=document.getElementById("email").value.trim();
+  const password=document.getElementById("password").value;
+  const msg=document.getElementById("msg");
+  if(!name||!origin||!email||!password){msg.textContent="Please fill every field.";return;}
+  const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:name,origin:origin}}});
+  if(error){msg.textContent=error.message;return;}
+  if(data.session){
+    await db.from("profiles").insert({id:data.user.id,full_name:name,origin:origin});
+    window.location="wishes.html";
+  } else {
+    msg.style.color="green";
+    msg.textContent="Registered! Check your email to confirm, then log in.";
+  }
+}
+</script>
+</body>
+</html>
