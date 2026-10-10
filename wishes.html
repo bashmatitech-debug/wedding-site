@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wishes</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:sans-serif;max-width:480px;margin:0 auto;padding:16px;background:#fdf6f0;color:#3b2f2f}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+textarea,input[type=file],button{width:100%;padding:12px;margin:8px 0;font-size:16px}
+textarea{height:110px}
+button{background:#b5651d;color:#fff;border:0;border-radius:8px}
+.top button{width:auto;padding:8px 14px;font-size:14px}
+button:disabled{opacity:.5}
+.wish{background:#fff;border-radius:10px;padding:12px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.wish b{display:block}
+.wish small{color:#7a6a6a}
+.wish p{white-space:pre-wrap;margin:8px 0}
+.wish img,.wish video{width:100%;border-radius:8px;margin-top:6px}
+#msg{color:#b00}
+</style>
+</head>
+<body>
+<div class="top"><span id="who"></span><button onclick="logout()">Log out</button></div>
+<h2>Share your wishes</h2>
+<textarea id="message" placeholder="Write your wish for the couple..."></textarea>
+<input type="file" id="file" accept="image/*,video/*">
+<button id="send" onclick="sendWish()">Post wish</button>
+<p id="msg"></p>
+<h3>Wishes from guests</h3>
+<div id="list">Loading...</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+let user;
+const $=id=>document.getElementById(id);
+
+async function init(){
+  const {data}=await db.auth.getSession();
+  if(!data.session){window.location="login.html";return;}
+  user=data.session.user;
+  const m=user.user_metadata||{};
+  $("who").textContent="Hi, "+(m.full_name||user.email);
+  loadWishes();
+}
+
+async function logout(){
+  await db.auth.signOut();
+  window.location="login.html";
+}
+
+async function sendWish(){
+  const msg=$("msg");
+  msg.style.color="#b00";
+  const text=$("message").value.trim();
+  const f=$("file").files[0];
+  if(!text){msg.textContent="Please write a message first.";return;}
+  if(f&&f.size>25*1024*1024){msg.textContent="File too big. Max 25 MB.";return;}
+  $("send").disabled=true;
+  msg.textContent="Posting...";
+  let media_url=null;
+  if(f){
+    const ext=(f.name.split(".").pop()||"bin").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const path=user.id+"/"+Date.now()+"."+ext;
+    const up=await db.storage.from("wedding-media").upload(path,f,{contentType:f.type});
+    if(up.error){msg.textContent="Upload failed: "+up.error.message;$("send").disabled=false;return;}
+    media_url=db.storage.from("wedding-media").getPublicUrl(path).data.publicUrl;
+  }
+  const m=user.user_metadata||{};
+  const ins=await db.from("wishes").insert({
+    full_name:m.full_name||user.email,
+    origin:m.origin||null,
+    message:text,
+    media_url:media_url
+  });
+  $("send").disabled=false;
+  if(ins.error){msg.textContent="Could not post: "+ins.error.message;return;}
+  $("message").value="";
+  $("file").value="";
+  msg.style.color="green";
+  msg.textContent="Wish posted. Thank you!";
+  loadWishes();
+}
+
+async function loadWishes(){
+  const {data,error}=await db.from("wishes").select("*").order("created_at",{ascending:false});
+  const list=$("list");
+  list.textContent="";
+  if(error){list.textContent="Could not load wishes: "+error.message;return;}
+  if(!data.length){list.textContent="No wishes yet. Be the first!";return;}
+  data.forEach(w=>{
+    const d=document.createElement("div");d.className="wish";
+    const n=document.createElement("b");n.textContent=w.full_name;
+    const s=document.createElement("small");s.textContent=w.origin?("From "+w.origin):"";
+    const p=document.createElement("p");p.textContent=w.message;
+    d.append(n,s,p);
+    if(w.media_url){
+      const isVid=/\.(mp4|webm|mov|m4v)$/i.test(w.media_url);
+      const el=document.createElement(isVid?"video":"img");
+      el.src=w.media_url;
+      if(isVid)el.controls=true;
+      d.append(el);
+    }
+    list.append(d);
+  });
+}
+init();
+</script>
+</body>
+</html>
