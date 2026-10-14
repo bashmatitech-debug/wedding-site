@@ -1,0 +1,2 @@
+html{background:linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),url(bg.jpg) center/cover no-repeat fixed;min-height:100%}
+body{background:rgba(253,246,240,.94);border-radius:14px;margin:20px auto;padding:20px 16px;width:calc(100% - 24px);box-sizing:border-box}
